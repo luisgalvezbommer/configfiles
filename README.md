@@ -29,6 +29,8 @@ Inspired by https://github.com/DoubleDotStudios/dotfiles/tree/main
 18. Install dunst (https://github.com/dunst-project/dunst)
 19. Install zoxide (https://github.com/ajeetdsouza/zoxide?tab=readme-ov-file#getting-started)
 20. Install atuin (https://docs.atuin.sh/#quickstart) (Pw: tevion89)
+21. Install ctags
+22. Install gptcommit
 
 
 Config Files:

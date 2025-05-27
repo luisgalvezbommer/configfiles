@@ -213,6 +213,23 @@ generate_tags() {
   echo "✅ Tags gespeichert in '$output_file'."
 }
 
+tags() {
+  local dir="${1:-.}"
+  local pattern="${2:-*}"
+  local -a files
+
+  # Finde alle Dateien mit passendem Pattern
+  IFS=$'\n' files=($(find "$dir" -name "$pattern"))
+
+  # Optional: Zeige gefundene Dateien zur Kontrolle
+  for f in "${files[@]}"; do
+    echo "$f"
+  done
+
+  # Übergib alle Dateien als einzelne Argumente
+  generate_tags "${files[@]}"
+}
+
 
 export PATH="/usr/local/binaryen-122:$PATH"
 export PATH=$PATH:/usr/local/go/bin
