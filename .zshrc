@@ -124,12 +124,15 @@ alias vi="nvim"
 alias vim="nvim"
 alias ls="lsd --group-dirs first"
 alias ll="lsd -Alh --group-dirs first"
-alias cat="bat -P"
+alias bat="batcat -P"
 alias df="df -h"
 alias re="grep -Hn"
-alias cd="z"
-alias c="z"
-alias ubuntu="fastfetch"
+alias ranger=". ranger"
+alias ra=". ranger"
+
+#alias cd="z"
+#alias c="z"
+#alias ubuntu="fastfetch"
 alias reload="source ~/.zshrc"
 
 # Handy change dir shortcuts
@@ -139,19 +142,19 @@ alias .3='cd ../../..'
 alias .4='cd ../../../..'
 alias .5='cd ../../../../..'
 
-export TERMINAL="/usr/bin/kitty"
-export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always --line-range :500 {}'"
+#export TERMINAL="/usr/bin/kitty"
+#export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always --line-range :500 {}'"
 
 
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
-zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
-zstyle ':completion:*' menu no
-zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
-zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
+#zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+#zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+#zstyle ':completion:*' menu no
+#zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
+#zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 
-source <(fzf --zsh)
-source ~/.config/fzf/fzf-git.sh
-eval "$(zoxide init zsh)"
+#source <(fzf --zsh)
+#source ~/.config/fzf/fzf-git.sh
+#eval "$(zoxide init zsh)"
 
 . "$HOME/.atuin/bin/env"
 
@@ -162,3 +165,54 @@ eval "$(pip completion --zsh)"
 source /etc/zsh_command_not_found
 export PATH=$PATH:/usr/local/bin
 
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+source <(fzf --zsh)
+
+# Golang environment variables
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/go
+
+# Update PATH to include GOPATH and GOROOT binaries
+export PATH=$GOPATH/bin:$GOROOT/bin:$HOME/.local/bin:$PATH
+
+alias fabric="~/fabric"
+alias german="~/fabric -sp german"
+
+summarize() {
+  fabric -y $1 | fabric -sp summarize
+}
+
+extract_wisdom() {
+  fabric -y $1 | fabric -sp extract_wisdom
+}
+
+generate_tags() {
+  # Standard-Ausgabedatei
+  local output_file="tags.txt"
+
+  # Wenn keine Argumente übergeben wurden, verwende '.' als Standard (aktuelles Verzeichnis)
+  if [ $# -eq 0 ]; then
+    set -- .
+  fi
+
+  # Schritt 1: Generiere tags_x.txt mit ctags
+  ctags -x --fields=+n -f "$output_file" "$@"
+
+  # Schritt 2: Sortieren und Leerzeilen einfügen (tags -> tags.tmp -> tags)
+  awk 'BEGIN { prev = "" }
+       {
+         if ($4 != prev) {
+           if (NR > 1) print "";
+           prev = $4
+         }
+         print
+       }' <(sort -k4,4 -k3,3n "$output_file") > "${output_file}.tmp"
+  
+  mv "${output_file}.tmp" "$output_file"
+
+  echo "✅ Tags gespeichert in '$output_file'."
+}
+
+
+export PATH="/usr/local/binaryen-122:$PATH"
+export PATH=$PATH:/usr/local/go/bin
