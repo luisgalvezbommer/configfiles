@@ -230,6 +230,11 @@ tags() {
   generate_tags "${files[@]}"
 }
 
-
 export PATH="/usr/local/binaryen-122:$PATH"
 export PATH=$PATH:/usr/local/go/bin
+
+gemmit() {
+  source ~/code/VirtualEnv/.venv-genai/bin/activate
+  python3 ~/code/gemmit/gemmit.py $1
+  deactivate
+}
