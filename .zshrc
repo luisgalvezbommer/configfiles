@@ -186,6 +186,9 @@ extract_wisdom() {
   fabric -y $1 | fabric -sp extract_wisdom
 }
 
+export PATH="/usr/local/binaryen-122:$PATH"
+export PATH=$PATH:/usr/local/go/bin
+
 generate_tags() {
   # Standard-Ausgabedatei
   local output_file="tags.txt"
@@ -196,7 +199,7 @@ generate_tags() {
   fi
 
   # Schritt 1: Generiere tags_x.txt mit ctags
-  ctags -x --fields=+n -f "$output_file" "$@"
+  ctags -x --fields=+KSn -f "$output_file" "$@"
 
   # Schritt 2: Sortieren und Leerzeilen einfügen (tags -> tags.tmp -> tags)
   awk 'BEGIN { prev = "" }
@@ -214,6 +217,7 @@ generate_tags() {
 }
 
 tags() {
+  #  Z.b. tags /directory "*.py"
   local dir="${1:-.}"
   local pattern="${2:-*}"
   local -a files
@@ -230,8 +234,10 @@ tags() {
   generate_tags "${files[@]}"
 }
 
-export PATH="/usr/local/binaryen-122:$PATH"
-export PATH=$PATH:/usr/local/go/bin
+tags2puml() {
+  python3 ~/code/tags2puml/tags2puml.py "$1"
+}
+
 
 gemmit() {
   source ~/code/VirtualEnv/.venv-genai/bin/activate
