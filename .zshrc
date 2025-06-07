@@ -244,3 +244,8 @@ gemmit() {
   python3 ~/code/gemmit/gemmit.py $1
   deactivate
 }
+
+praat() {
+  export GTK_THEME=Adwaita praat
+  ./praat
+}
