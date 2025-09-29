@@ -252,4 +252,62 @@ praat() {
 
 alias kubectl="minikube kubectl --"
 
-alias shot="~/code/shot/shot"
+# Git-Helfer: shot = add + commit in einem Schritt
+unalias shot 2>/dev/null
+
+shot() {
+  # Prüfen, ob wir in einem Git-Repository sind
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    echo "❌ Dieses Verzeichnis ist kein Git-Repository."
+    echo "   → Du kannst eins erstellen mit: git init"
+    return 1
+  fi
+
+  # Argumente parsen
+  files=()
+  message=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -m)
+        shift
+        message="$1"
+        ;;
+      *)
+        files+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  # Dateien hinzufügen
+  if [ ${#files[@]} -eq 0 ]; then
+    echo "📂 Keine Dateien angegeben – füge alle hinzu (git add .)"
+    git add .
+  else
+    echo "📂 Füge Dateien hinzu: ${files[*]}"
+    git add "${files[@]}"
+  fi
+
+  # Commit ausführen
+  if [ -z "$message" ]; then
+    echo "❌ Keine Commit-Message angegeben! Bitte -m \"Nachricht\" angeben."
+    return 1
+  fi
+
+  echo "💬 Commit mit Nachricht: \"$message\""
+  git commit -m "$message"
+
+  # Optional: Status danach anzeigen
+  echo
+  git status -sb
+}
+
+alias restore="git restore"
+
+checkout() {
+  local commit
+  commit=$(git log --oneline | fzf --prompt="🔍 Commit auswählen: " --height=80%)
+  [ -n "$commit" ] || return
+  git checkout $(echo "$commit" | awk '{print $1}')
+}
