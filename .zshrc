@@ -249,3 +249,7 @@ praat() {
   export GTK_THEME=Adwaita praat
   ./praat
 }
+
+alias kubectl="minikube kubectl --"
+
+alias shot="~/code/shot/shot"
