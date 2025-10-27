@@ -311,3 +311,100 @@ checkout() {
   [ -n "$commit" ] || return
   git checkout $(echo "$commit" | awk '{print $1}')
 }
+
+memmap() {
+  if [ -z "$1" ]; then
+    echo "🔹 Nutzung: memmap <PID>"
+    return 1
+  fi
+
+  local PID=$1
+
+  if [ ! -r "/proc/$PID/smaps" ]; then
+    echo "❌ Prozess $PID existiert nicht oder keine Berechtigung."
+    return 1
+  fi
+
+  echo "📊 Speicherverteilung für PID $PID"
+  echo "--------------------------------------"
+
+  printf "%-20s %12s %10s\n" "Segment" "RSS (MB)" "%"
+  echo "--------------------------------------"
+
+  awk '
+    /^[0-9a-f]/ {
+      # Extract segment name from address line
+      if (match($0, /\[heap\]/)) {
+        current = "[heap]"
+      } else if (match($0, /\[stack\]/)) {
+        current = "[stack]"
+      } else if (match($0, /\[vdso\]/)) {
+        current = "[vdso]"
+      } else if (match($0, /\[vvar\]/)) {
+        current = "[vvar]"
+      } else if (match($0, /\[vsyscall\]/)) {
+        current = "[vsyscall]"
+      } else if (match($0, /\[vvar_vclock\]/)) {
+        current = "[vvar_vclock]"
+      } else if (NF > 5 && $NF ~ /\//) {
+        # Has a filename/path - group similar files
+        path = $NF
+        if (path ~ /\.so(\.|$)/) {
+          current = "[libraries]"
+        } else if (path ~ /\.zwc$/) {
+          current = "[zwc-files]"
+        } else {
+          current = path
+        }
+      } else {
+        # Anonymous mapping
+        current = "[anon]"
+      }
+    }
+    /^Rss:/ {
+      section_rss[current] += $2
+      total_rss += $2
+    }
+    END {
+      for (key in section_rss) {
+        rss_mb = section_rss[key] / 1024
+        perc = (section_rss[key] / total_rss) * 100
+        printf "%-20s %10.2f %9.2f%%\n", key, rss_mb, perc
+      }
+      
+      print "TOTAL:" total_rss > "/dev/stderr"
+    }
+  ' "/proc/$PID/smaps" 2>&1 | grep -v "^TOTAL:" | sort -t ' ' -k3 -nr
+
+  total=$(awk '/^Rss:/ {total += $2} END {printf "%.2f", total/1024}' "/proc/$PID/smaps")
+  
+  echo "--------------------------------------"
+  echo "Gesamter RSS: $total MB"
+}
+
+export mytimezone="Europe/Berlin"
+
+n8n() {
+  docker run -it --rm \
+ --name n8n \
+ -p 5678:5678 \
+ -e GENERIC_TIMEZONE=$mytimezone \
+ -e TZ=$mytimezone \
+ -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
+ -e N8N_RUNNERS_ENABLED=true \
+ -v n8n_data:/home/node/.n8n \
+ docker.n8n.io/n8nio/n8n
+}
+
+git_sec() {
+  if [ $# -eq 0 ]; then
+    echo "Usage: git_sec <filename-pattern> [<filename-pattern> ...]"
+    return 1
+  fi
+
+  for pattern in "$@"; do
+    echo "=== Searching for: $pattern ==="
+    git log --all --pretty=format:"%h | %an | %ad | %s" --name-only -- "**/$pattern" | awk 'NF'
+    echo
+  done
+}
