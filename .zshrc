@@ -408,3 +408,133 @@ git_sec() {
     echo
   done
 }
+
+license_audit() {
+  local target="${1:-.}"
+  local outdir="$target/.license_scan"
+  mkdir -p "$outdir"
+
+  echo "🔍 [INFO] Starte PARALLELEN Lizenz- und Sicherheits-Scan für: $target"
+  echo "------------------------------------------------------------"
+
+  # 1️⃣ Quellcode-Lizenzen
+  (
+    echo "📄 [1/5] Scanne Quellcode-Lizenzen..."
+    docker run --rm -v "$(realpath "$target")":/src ghcr.io/nexb/scancode-toolkit:latest \
+      --json-pp /src/.license_scan/scancode.json /src > /dev/null 2>&1
+    echo "✅ ScanCode abgeschlossen → $outdir/scancode.json"
+  ) &
+
+  # 2️⃣ Abhängigkeitslizenzen
+  (
+    echo "📦 [2/5] Prüfe Abhängigkeitslizenzen..."
+    if [[ -f "$target/package.json" ]]; then
+      docker run --rm -v "$(realpath "$target")":/scan licensee/licensee detect /scan --json > "$outdir/dependencies.json" 2>/dev/null
+      echo "✅ npm/yarn Dependencies analysiert → $outdir/dependencies.json"
+    elif [[ -f "$target/requirements.txt" || -f "$target/pyproject.toml" ]]; then
+      docker run --rm -v "$(realpath "$target")":/scan palkan/license_finder report --format json > "$outdir/dependencies.json" 2>/dev/null
+      echo "✅ Python Dependencies analysiert → $outdir/dependencies.json"
+    else
+      echo "ℹ️  Keine Abhängigkeitsdateien gefunden."
+    fi
+  ) &
+
+  # 3️⃣ Secrets
+  (
+    echo "🛡️  [3/5] Scanne auf Secrets & sensible Inhalte..."
+    docker run --rm -v "$(realpath "$target")":/data ghcr.io/gitguardian/ggshield scan repo /data --json > "$outdir/ggshield.txt" 2>/dev/null
+    echo "✅ Secret-Scan abgeschlossen → $outdir/ggshield.txt"
+  ) &
+
+  # 4️⃣ SBOM
+  (
+    echo "🧾 [4/5] Erstelle SBOM (SPDX JSON)..."
+    docker run --rm -v "$(realpath "$target")":/src anchore/syft:latest dir:/src -o spdx-json=/src/.license_scan/sbom.json > /dev/null 2>&1
+    echo "✅ SBOM erstellt → $outdir/sbom.json"
+  ) &
+
+  wait
+  echo "⚖️  [5/5] Analysiere Ergebnisse..."
+  echo "🖥️  [INFO] Erstelle HTML-Report..."
+
+  # 5️⃣ HTML-Report
+  {
+    echo "<!DOCTYPE html>"
+    echo "<html lang='de'><head><meta charset='UTF-8'>"
+    echo "<title>Lizenz- & Sicherheits-Report</title>"
+    echo "<style>
+      body { font-family: system-ui, sans-serif; background: #f9fafb; color: #111; margin: 2rem; }
+      h1 { color: #0369a1; border-bottom: 3px solid #0ea5e9; padding-bottom: .3rem; }
+      .section { background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.1); border-radius: 12px; margin: 1.2rem 0; padding: 1rem 1.4rem; }
+      .ok { color: #16a34a; font-weight: bold; }
+      .warn { color: #d97706; font-weight: bold; }
+      .err { color: #dc2626; font-weight: bold; }
+      code { background: #f1f5f9; padding: 3px 5px; border-radius: 6px; font-size: 0.9rem; }
+      table { border-collapse: collapse; width: 100%; margin-top: .5rem; }
+      th, td { padding: .5rem .8rem; border-bottom: 1px solid #e5e7eb; text-align: left; }
+      th { background: #f3f4f6; }
+    </style></head><body>"
+    echo "<h1>🔍 Lizenz- & Sicherheits-Report</h1>"
+
+    echo "<div class='section'><h2>📄 Quellcode-Lizenzen</h2>"
+    if [[ -f "$outdir/scancode.json" ]]; then
+      echo "<p class='ok'>✅ ScanCode abgeschlossen – Datei gefunden.</p>"
+    else
+      echo "<p class='err'>❌ Keine ScanCode-Daten gefunden!</p>"
+    fi
+    echo "</div>"
+
+    echo "<div class='section'><h2>📦 Abhängigkeitslizenzen</h2>"
+    if [[ -f "$outdir/dependencies.json" ]]; then
+      echo "<p class='ok'>✅ Abhängigkeitslizenzen analysiert.</p>"
+    else
+      echo "<p class='warn'>⚠️ Keine Abhängigkeitsdaten gefunden oder keine Packages vorhanden.</p>"
+    fi
+    echo "</div>"
+
+    echo "<div class='section'><h2>🛡️ Secret-Scan</h2>"
+    if [[ -f "$outdir/ggshield.txt" ]]; then
+      local secrets_found
+      secrets_found=$(grep -c '"policy_break_count":[1-9]' "$outdir/ggshield.txt" 2>/dev/null || echo 0)
+      secrets_found="${secrets_found//[^0-9]/}"  # nur Ziffern behalten
+      if [[ "${secrets_found:-0}" -gt 0 ]] 2>/dev/null; then
+        echo "<p class='err'>🚨 Warnung: $secrets_found mögliche Secrets gefunden!</p>"
+      else
+        echo "<p class='ok'>✅ Keine Secrets gefunden.</p>"
+      fi
+    else
+      echo "<p class='warn'>⚠️ Secret-Scan-Ergebnisse fehlen.</p>"
+    fi
+    echo "</div>"
+
+    echo "<div class='section'><h2>🧾 SBOM (Software Bill of Materials)</h2>"
+    if [[ -f "$outdir/sbom.json" ]]; then
+      echo "<p class='ok'>✅ SBOM erstellt – SPDX JSON verfügbar.</p>"
+    else
+      echo "<p class='err'>❌ SBOM konnte nicht erstellt werden.</p>"
+    fi
+    echo "</div>"
+
+    echo "<div class='section'><h2>📊 Zusammenfassung</h2>"
+    echo "<table><tr><th>Check</th><th>Status</th></tr>"
+    echo "<tr><td>Quellcode-Lizenzen</td><td>$( [[ -f "$outdir/scancode.json" ]] && echo ✅ || echo ❌ )</td></tr>"
+    echo "<tr><td>Abhängigkeiten</td><td>$( [[ -f "$outdir/dependencies.json" ]] && echo ✅ || echo ⚠️ )</td></tr>"
+    echo "<tr><td>Secrets</td><td>$( [[ -f "$outdir/ggshield.txt" ]] && echo ✅ || echo ⚠️ )</td></tr>"
+    echo "<tr><td>SBOM</td><td>$( [[ -f "$outdir/sbom.json" ]] && echo ✅ || echo ❌ )</td></tr>"
+    echo "</table>"
+    echo "<p>📁 Ergebnisse unter: <code>$outdir</code></p>"
+    echo "</div>"
+    echo "<footer style='text-align:center; color:#6b7280; margin-top:2rem;'>"
+    echo "Erstellt am $(date '+%Y-%m-%d %H:%M:%S') auf $(hostname)"
+    echo "</footer></body></html>"
+  } > "$outdir/report.html"
+
+  echo "✅ HTML-Report erstellt → $outdir/report.html"
+  echo "------------------------------------------------------------"
+  echo "📊 Vollständige Ergebnisse im Ordner: $outdir"
+  echo "------------------------------------------------------------"
+
+  if command -v xdg-open >/dev/null 2>&1; then
+    nohup xdg-open "$outdir/report.html" >/dev/null 2>&1 &
+  fi
+}
