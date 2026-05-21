@@ -52,5 +52,37 @@ Optional:
 2. Install midnight commander (https://midnight-commander.org/)
 3. Install ranger (https://github.com/ranger/ranger)
 
+## Activity-Watch:
 
+### Autostart einrichten (Ordner in ~/Applications/activitywatch)
+1. Startprogramme öffnen
+2. Hinzufügen
+3. Name: Activity Watch
+4. Befehl:
+```
+/home/<DEIN_USERNAME>/Applications/activitywatch/aw-qt
+```
 
+### Als Desktop-Icon hinzufügen
+
+Datei erstellen:
+```
+vi ~/.local/share/applications/activitywatch-dashboard.desktop
+```
+
+Mit folgendem Inhalt:
+```
+[Desktop Entry]
+Name=ActivityWatch Dashboard
+Exec=xdg-open http://localhost:5600
+Type=Application
+Terminal=false
+Icon=utilities-system-monitor
+```
+
+Dann ausführbar machen:
+```
+chmod +x ~/.local/share/applications/activitywatch-dashboard.desktop
+```
+
+Dann an Dash anheften
