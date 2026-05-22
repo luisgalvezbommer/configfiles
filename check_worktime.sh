@@ -20,6 +20,7 @@ WEEK_TARGET=$((40*3600))      # Weekly target: 40 hours
 # File that stores the last reported full hour
 LAST_HOUR_FILE="/tmp/check_worktime_last_hour_$(id -u)"
 DEBUG_MANUAL=0
+TAG_FILTERS=()
 
 # Detect manual invocations from a terminal (cron usually has no TTY)
 is_manual_invocation() {
@@ -29,8 +30,20 @@ is_manual_invocation() {
 # Calculate seconds for a range (e.g. :day, :week)
 seconds_for_range() {
   local range="$1"
-  $TIMEW export "$range" 2>/dev/null | $JQ '[.[] 
-    | select(.tags and ((.tags | index("work")) or (.tags | index("arbeit")))) 
+  local tags_json
+
+  tags_json=$($JQ -nc '$ARGS.positional' --args "${TAG_FILTERS[@]}")
+
+  $TIMEW export "$range" 2>/dev/null | $JQ --argjson tags "$tags_json" '[.[] 
+    | . as $item
+    | select(
+        .tags
+        and (
+          if ($tags | length) == 0 then true
+          else all($tags[]; ($item.tags | index(.)) != null)
+          end
+        )
+      )
     | (if .duration then .duration
        elif (.start and .end) then ((.end | strptime("%Y%m%dT%H%M%SZ") | mktime) - (.start | strptime("%Y%m%dT%H%M%SZ") | mktime))
        elif .start then (now - (.start | strptime("%Y%m%dT%H%M%SZ") | mktime))
@@ -40,8 +53,22 @@ seconds_for_range() {
 
 # Print per-day totals for the current week: "YYYY-MM-DD seconds"
 week_per_day() {
-  $TIMEW export :week 2>/dev/null | $JQ -r '
-    map(select(.tags and ((.tags | index("work")) or (.tags | index("arbeit"))))) 
+  local tags_json
+
+  tags_json=$($JQ -nc '$ARGS.positional' --args "${TAG_FILTERS[@]}")
+
+  $TIMEW export :week 2>/dev/null | $JQ --argjson tags "$tags_json" -r '
+    map(
+      . as $item
+      | select(
+          .tags
+          and (
+            if ($tags | length) == 0 then true
+            else all($tags[]; ($item.tags | index(.)) != null)
+            end
+          )
+        )
+    ) 
     | map(. as $it 
         | (if .duration then .duration
            elif (.start and .end) then ((.end | strptime("%Y%m%dT%H%M%SZ") | mktime) - (.start | strptime("%Y%m%dT%H%M%SZ") | mktime))
@@ -101,16 +128,17 @@ format_percent() {
 }
 
 manual_debug_day() {
-  $TIMEW :day summary
+  $TIMEW :day summary "${TAG_FILTERS[@]}"
 }
 
 manual_debug_week() {
-  $TIMEW :week summary
+  $TIMEW :week summary "${TAG_FILTERS[@]}"
 }
 
 # Daily check: notify only when a new full hour is reached
 notify_on_new_full_hour() {
   local force_notify seconds_today hours_now last_hours
+  local worked_hm target_hm worked_percent
   force_notify="${1:-0}"
 
   seconds_today=$(seconds_for_range ":day")
@@ -133,15 +161,10 @@ notify_on_new_full_hour() {
   if [ "$force_notify" -eq 1 ] || { [ "$hours_now" -gt "$last_hours" ] && [ "$hours_now" -ge 1 ]; }; then
     # Build message
     local title="Worktime Update"
-    local msg="Worked today: $(format_hm "$seconds_today") (full hours: ${hours_now}h)."
-
-    if [ "$force_notify" -eq 1 ] && ! { [ "$hours_now" -gt "$last_hours" ] && [ "$hours_now" -ge 1 ]; }; then
-      msg="$msg  (Manual status check)"
-    fi
-
-    if [ "$hours_now" -ge 8 ]; then
-      msg="$msg  Daily target reached (>= $(format_hm $DAILY_TARGET))."
-    fi
+    worked_hm=$(format_hm "$seconds_today")
+    target_hm=$(format_hm "$DAILY_TARGET")
+    worked_percent=$(format_percent "$seconds_today" "$DAILY_TARGET" | tr '.' ',')
+    local msg="Worked: ${worked_hm}/${target_hm} (${worked_percent}%)"
 
     # Send notification
     $NOTIFY "$title" "$msg" 2>/dev/null
@@ -204,11 +227,30 @@ notify_weekly_summary() {
   fi
 }
 
-# Entry point: "daily" or "weekly"
+# Entry point: "daily" or "weekly" plus optional tags
+# Examples:
+#   check_worktime.sh daily arbeit
+#   check_worktime.sh weekly arbeit meeting
 FORCE_NOTIFY=0
-if [ "$2" = "--force" ]; then
-  FORCE_NOTIFY=1
-elif is_manual_invocation; then
+MODE="${1:-daily}"
+
+if [ $# -gt 0 ]; then
+  shift
+fi
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --force)
+      FORCE_NOTIFY=1
+      ;;
+    *)
+      TAG_FILTERS+=("$1")
+      ;;
+  esac
+  shift
+done
+
+if [ "$FORCE_NOTIFY" -eq 0 ] && is_manual_invocation; then
   FORCE_NOTIFY=1
 fi
 
@@ -216,7 +258,7 @@ if is_manual_invocation; then
   DEBUG_MANUAL=1
 fi
 
-case "$1" in
+case "$MODE" in
   daily)
     notify_on_new_full_hour "$FORCE_NOTIFY"
     ;;

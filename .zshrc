@@ -544,6 +544,13 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
+unalias daily 2>/dev/null
+unalias weekly 2>/dev/null
 
-alias daily="~/Applications/check_worktime.sh daily"
-alias weekly="~/Applications/check_worktime.sh weekly"
+daily() {
+  ~/Applications/check_worktime.sh daily "$@"
+}
+
+weekly() {
+  ~/Applications/check_worktime.sh weekly "$@"
+}
