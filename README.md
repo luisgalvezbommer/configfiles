@@ -110,3 +110,10 @@ Cron job alle 5 Minuten ausführen lassen:
 0 16 * * * /home/lgbo/Applications/check_worktime.sh weekly
 
 ```
+
+Start und stop
+```
+timew start '!arbeit' issue '~Kommentar'
+
+timew stop
+```
