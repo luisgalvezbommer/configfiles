@@ -86,3 +86,6 @@ chmod +x ~/.local/share/applications/activitywatch-dashboard.desktop
 ```
 
 Dann an Dash anheften
+
+## Timewarior
+https://timewarrior.net/docs/install/
