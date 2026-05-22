@@ -103,10 +103,10 @@ crontab -e
 Cron job alle 5 Minuten ausführen lassen:
 ```
 # Stündlich prüfen jeweils zur vollen Stunde
-*/5 * * * * /home/lgbo/Applications/check_worktime.sh hourly
+*/5 * * * * /home/lgbo/Applications/check_worktime.sh daily
 
 # Tägliche Wochenübersicht um 10:00 und 16:00
-0 10 * * * /home/lgbo/Applications/check_worktime.sh daily
-0 16 * * * /home/lgbo/Applications/check_worktime.sh daily
+0 10 * * * /home/lgbo/Applications/check_worktime.sh weekly
+0 16 * * * /home/lgbo/Applications/check_worktime.sh weekly
 
 ```

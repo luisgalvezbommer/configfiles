@@ -129,6 +129,7 @@ alias df="df -h"
 alias re="grep -Hn"
 alias ranger=". ranger"
 alias ra=". ranger"
+alias docker-compose="docker compose"
 
 #alias cd="z"
 #alias c="z"
@@ -166,7 +167,7 @@ source /etc/zsh_command_not_found
 export PATH=$PATH:/usr/local/bin
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-source <(fzf --zsh)
+#source <(fzf --zsh)
 
 # Golang environment variables
 export GOROOT=/usr/local/go
@@ -538,3 +539,11 @@ license_audit() {
     nohup xdg-open "$outdir/report.html" >/dev/null 2>&1 &
   fi
 }
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+
+alias daily="~/Applications/check_worktime.sh daily"
+alias weekly="~/Applications/check_worktime.sh weekly"
